@@ -59,11 +59,16 @@ endif(BUILD_TESTING)
 include_directories("${CMAKE_SOURCE_DIR}")
 
 
-#add_executable ( staticVectorTests ${STATIC_VECTOR_TESTS} )
+	set (STATIC_VECTOR_EXAMPLE
+	  ${CMAKE_SOURCE_DIR}/StaticVectorExample.cpp
+	)
 
-	#target_link_libraries( performance_test
-	#	boost_graph
-	#)
+
+add_executable ( staticVectorExample ${STATIC_VECTOR_EXAMPLE} )
+
+#target_link_libraries( staticVectorExample
+#  boost_graph
+#)
 	
 
 
