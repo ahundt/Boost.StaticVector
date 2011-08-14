@@ -32,3 +32,10 @@ Requirements:
 
 Sample Code:
   See StaticVectorExample.cpp
+
+
+Test Compilers:
+  OSX: 
+    GCC 4.2.1
+  Linux:
+    GCC 4.4
