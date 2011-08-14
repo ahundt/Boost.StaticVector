@@ -67,7 +67,7 @@ namespace boost {
     class StaticVector {
       private:
         std::size_t m_size;
-        T elems[N];    // fixed-size array of elements of type T
+        char elems[N * sizeof(T)];    // fixed-size array of elements of type T
 
       public:
         // type definitions
@@ -82,13 +82,13 @@ namespace boost {
         typedef std::ptrdiff_t difference_type;
 
         // iterator support
-        iterator        begin()       { return elems; }
-        const_iterator  begin() const { return elems; }
-        const_iterator cbegin() const { return elems; }
+        iterator        begin()       { return reinterpret_cast<iterator>(elems); }
+        const_iterator  begin() const { return reinterpret_cast<const_iterator>(elems); }
+        const_iterator cbegin() const { return reinterpret_cast<const_iterator>(elems); }
         
-        iterator        end()       { return elems+m_size; }
-        const_iterator  end() const { return elems+m_size; }
-        const_iterator cend() const { return elems+m_size; }
+        iterator        end()       { return to_object(m_size); }
+        const_iterator  end() const { return to_object(m_size); }
+        const_iterator cend() const { return to_object(m_size); }
 
         // reverse iterator support
 #if !defined(BOOST_NO_TEMPLATE_PARTIAL_SPECIALIZATION) && !defined(BOOST_MSVC_STD_ITERATOR) && !defined(BOOST_NO_STD_ITERATOR_TRAITS)
@@ -153,13 +153,14 @@ namespace boost {
 
         void push_back (const_reference x){
           capacitycheck(size()+1);
-          elems[size()] = x;
+          
+          new (to_object(size())) T(x);
           m_size++;
         }
 
         void pop_back(){
           if(!empty()){
-            elems[size()-1].~T();
+            to_object(size()-1)->~T();
             m_size--;
           } else {
             throw std::out_of_range("StaticVector<> pop called on empty container.");
@@ -199,14 +200,14 @@ namespace boost {
 
         iterator erase(iterator first, iterator last){
           size_t n = last-first;
-	  if (n>0) {
-	    rangecheck(size()-n);
-	    for(iterator it = first; it!=last; it++){
-	      it->~T();
-	    }
-	    std::copy(last,end(),first);
-	    m_size -= n;
-	  }
+	        if (n>0) {
+      	    rangecheck(size()-n);
+      	    for(iterator it = first; it!=last; it++){
+      	      it->~T();
+      	    }
+      	    std::copy(last,end(),first);
+      	    m_size -= n;
+      	  }
           return first;
         }
 
@@ -232,38 +233,38 @@ namespace boost {
         reference operator[](size_type i) 
         { 
             BOOST_ASSERT( i < N || i < size() && "StaticVector<>: out of range" );
-            return elems[i];
+            return *to_object(i);
         }
         
         const_reference operator[](size_type i) const 
         {     
             BOOST_ASSERT( i < N || i < size() && "StaticVector<>: out of range" );
-            return elems[i]; 
+            return *to_object(i); 
         }
 
         // at() with range check
-        reference at(size_type i) { rangecheck(i); return elems[i]; }
-        const_reference at(size_type i) const { rangecheck(i); return elems[i]; }
+        reference at(size_type i) { rangecheck(i); return *to_object(i); }
+        const_reference at(size_type i) const { rangecheck(i); return *to_object(i); }
     
         // front() and back()
         reference front() 
         { 
-            return elems[0]; 
+            return begin(); 
         }
         
         const_reference front() const 
         {
-            return elems[0];
+            return begin();
         }
         
         reference back() 
         { 
-            return elems[m_size-1];
+            return *to_object(size()-1);
         }
         
         const_reference back() const 
         { 
-            return elems[m_size-1];
+            return *to_object(size()-1);
         }
 
         // capacity is constant, size varies
@@ -277,7 +278,7 @@ namespace boost {
         void swap (StaticVector<T,N>& y) {
 #if ((BOOST_VERSION / 100) % 1000) > 44
             for (size_type i = 0; i < N; ++i)
-                boost::swap(elems[i],y.elems[i]);
+                boost::swap(*to_object(i),*y.to_object(i));
             boost::swap(m_size,y.m_size);
 #else
             std::swap_ranges(begin(),end(),y.begin());
@@ -322,8 +323,17 @@ namespace boost {
                boost::throw_exception(e);
            }
        }
-
-    };
+       
+private:
+    inline const_pointer to_object(unsigned index) const {
+        return reinterpret_cast<const_pointer>(elems) + index;
+    }
+    
+    inline pointer to_object(unsigned index) {
+        return reinterpret_cast<pointer>(elems) + index;
+    }
+    
+}; // class StaticVector
 
 #if !defined(BOOST_NO_TEMPLATE_PARTIAL_SPECIALIZATION)
     template< class T >
