@@ -14,7 +14,8 @@
  *  StaticVector is not accepted as part of boost.
  */
 
-#define BOOST_TEST_MODULE StaticVectorTest
+#define BOOST_TEST_DYN_LINK
+#define BOOST_TEST_MODULE StaticVectorTests
 
 #include <StaticVector.hpp>
 #include <boost/test/unit_test.hpp>
