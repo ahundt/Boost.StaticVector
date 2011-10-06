@@ -60,26 +60,38 @@
 // FIXES for broken compilers
 #include <boost/config.hpp>
 
+// Selection of types for internal storage
+#include <boost/integer.hpp>
+#include <boost/type_traits/alignment_of.hpp>
+#include <boost/type_traits/aligned_storage.hpp>
+
 
 namespace boost {
 
     template<class T, std::size_t N>
     class StaticVector {
-      private:
-        std::size_t m_size;
-        char elems[N * sizeof(T)];    // fixed-size array of elements of type T
-
       public:
         // type definitions
-        typedef T              value_type;
-        typedef T*             pointer;
-        typedef const T*      const_pointer;
-        typedef T*             iterator;
-        typedef const T*       const_iterator;
-        typedef T&             reference;
-        typedef const T&       const_reference;
-        typedef std::size_t    size_type;
-        typedef std::ptrdiff_t difference_type;
+        typedef T                                              value_type;
+        typedef T*                                             pointer;
+        typedef const T*                                       const_pointer;
+        typedef T*                                             iterator;
+        typedef const T*                                       const_iterator;
+        typedef T&                                             reference;
+        typedef const T&                                       const_reference;
+        typedef typename boost::aligned_storage<               
+                           sizeof(T),                          
+                           boost::alignment_of<T>::value       
+                         >::type                               aligned_storage;
+        typedef typename boost::uint_value_t<N>::least         size_type;
+        typedef std::size_t                                    max_size_type;
+        typedef std::ptrdiff_t                                 difference_type;
+        
+      private:
+        size_type m_size; // fastest type that can accomodate N
+        aligned_storage elems[N];    // fixed-size array of memory aligned elements of type T
+
+      public:
 
         // iterator support
         iterator        begin()       { return reinterpret_cast<iterator>(elems); }
@@ -175,7 +187,7 @@ namespace boost {
           return pos;
         }
 
-        void insert(iterator pos, size_type n, const_reference x){
+        void insert(iterator pos, max_size_type n, const_reference x){
           capacitycheck(size()+n);
           std::copy_backward(pos,end(),end()+n);
           std::fill(pos,pos+n,x);
@@ -184,7 +196,7 @@ namespace boost {
 
         template <typename InputIterator>
         void insert(iterator pos, InputIterator first, InputIterator last){
-          std::size_t n = last - first;
+          max_size_type n = last - first;
           capacitycheck(size()+n);
           std::copy_backward(pos,end(),end()+n);
           std::copy(first,last,pos);
@@ -199,7 +211,7 @@ namespace boost {
         }
 
         iterator erase(iterator first, iterator last){
-          size_t n = last-first;
+          std::ptrdiff_t n = last-first;
 	        if (n>0) {
       	    rangecheck(size()-n);
       	    for(iterator it = first; it!=last; it++){
@@ -215,7 +227,7 @@ namespace boost {
           erase(begin(),end());
         }
 
-        void resize(size_type n, const_reference t = T() ){
+        void resize(max_size_type n, const_reference t = T() ){
           capacitycheck(n);
           if(n - m_size > 0){
             std::fill_n(end(), n-m_size, t);
@@ -225,26 +237,26 @@ namespace boost {
 	  m_size = n;
 	}
 
-        void reserve(size_type n){
+        void reserve(max_size_type n){
           capacitycheck(n);
         }
 
         // operator[]
-        reference operator[](size_type i) 
+        reference operator[](max_size_type i) 
         { 
             BOOST_ASSERT( i < N || i < size() && "StaticVector<>: out of range" );
             return *to_object(i);
         }
         
-        const_reference operator[](size_type i) const 
+        const_reference operator[](max_size_type i) const 
         {     
             BOOST_ASSERT( i < N || i < size() && "StaticVector<>: out of range" );
             return *to_object(i); 
         }
 
         // at() with range check
-        reference at(size_type i) { rangecheck(i); return *to_object(i); }
-        const_reference at(size_type i) const { rangecheck(i); return *to_object(i); }
+        reference at(max_size_type i) { rangecheck(i); return *to_object(i); }
+        const_reference at(max_size_type i) const { rangecheck(i); return *to_object(i); }
     
         // front() and back()
         reference front() 
@@ -268,10 +280,10 @@ namespace boost {
         }
 
         // capacity is constant, size varies
-        size_type size() const { return m_size; }
-        static size_type capacity() { return N; }
+        max_size_type size() const { return m_size; }
+        static max_size_type capacity() { return N; }
         bool empty() { return m_size == 0; }
-        static size_type max_size() { return N; }
+        static max_size_type max_size() { return N; }
         enum { static_size = N };
 
         // swap (note: linear complexity)
@@ -309,7 +321,7 @@ namespace boost {
         }
 
         // check range (may be private because it is static)
-       void rangecheck (size_type i) const {
+       void rangecheck (max_size_type i) const {
             if (i >= size()) {
                 std::out_of_range e("StaticVector<>: index out of range");
                 boost::throw_exception(e);
@@ -317,7 +329,7 @@ namespace boost {
         }
 
        // check range (may be private because it is static)
-      void capacitycheck (size_type i) const {
+      void capacitycheck (max_size_type i) const {
            if (i > capacity()) {
                std::out_of_range e("StaticVector<>: index out of capacity");
                boost::throw_exception(e);
@@ -325,11 +337,11 @@ namespace boost {
        }
        
 private:
-    inline const_pointer to_object(unsigned index) const {
+    inline const_pointer to_object(size_type index) const {
         return reinterpret_cast<const_pointer>(elems) + index;
     }
     
-    inline pointer to_object(unsigned index) {
+    inline pointer to_object(size_type index) {
         return reinterpret_cast<pointer>(elems) + index;
     }
     
@@ -341,13 +353,18 @@ private:
 
       public:
         // type definitions
-        typedef T              value_type;
-        typedef T*             iterator;
-        typedef const T*       const_iterator;
-        typedef T&             reference;
-        typedef const T&       const_reference;
-        typedef std::size_t    size_type;
-        typedef std::ptrdiff_t difference_type;
+        typedef T                                              value_type;
+        typedef T*                                             iterator;
+        typedef const T*                                       const_iterator;
+        typedef T&                                             reference;
+        typedef const T&                                       const_reference;
+        typedef typename boost::aligned_storage<               
+                           sizeof(T),                          
+                           boost::alignment_of<T>::value       
+                         >::type                               aligned_storage;
+        typedef typename boost::uint_value_t<0>::least         size_type;
+        typedef std::size_t                                    max_size_type;
+        typedef std::ptrdiff_t                                 difference_type;
 
         // iterator support
         iterator        begin()       { return       iterator( reinterpret_cast<       T * >( this ) ); }
@@ -407,7 +424,7 @@ private:
           return failed_rangecheck();
         }
 
-        void insert(iterator pos, size_type n, const_reference x){
+        void insert(iterator pos, max_size_type n, const_reference x){
           failed_rangecheck();
         }
 
@@ -427,7 +444,7 @@ private:
         void clear(){
         }
 
-        void resize(size_type n, const_reference t = T() ){
+        void resize(max_size_type n, const_reference t = T() ){
           failed_rangecheck();
         }
 
@@ -436,19 +453,19 @@ private:
         }
 
         // operator[]
-        reference operator[](size_type /*i*/)
+        reference operator[](max_size_type /*i*/)
         {
             return failed_rangecheck();
         }
 
-        const_reference operator[](size_type /*i*/) const
+        const_reference operator[](max_size_type /*i*/) const
         {
             return failed_rangecheck();
         }
 
         // at() with range check
-        reference at(size_type /*i*/)               {   return failed_rangecheck(); }
-        const_reference at(size_type /*i*/) const   {   return failed_rangecheck(); }
+        reference at(max_size_type /*i*/)               {   return failed_rangecheck(); }
+        const_reference at(max_size_type /*i*/) const   {   return failed_rangecheck(); }
 
         // front() and back()
         reference front()
@@ -472,9 +489,9 @@ private:
         }
 
         // size is constant
-        static size_type size() { return 0; }
+        static max_size_type size() { return 0; }
         static bool empty() { return true; }
-        static size_type max_size() { return 0; }
+        static max_size_type max_size() { return 0; }
         enum { static_size = 0 };
 
         void swap (StaticVector<T,0>& /*y*/) {
