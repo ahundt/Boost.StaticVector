@@ -69,6 +69,8 @@ add_executable ( staticVectorExample ${STATIC_VECTOR_EXAMPLE} )
 #target_link_libraries( staticVectorExample
 #  boost_graph
 #)
+
+add_executable(benchStaticVector benchStaticVector.cpp)
 	
 
 

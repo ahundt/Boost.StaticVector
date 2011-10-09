@@ -18,6 +18,7 @@
  * accompanying file LICENSE_1_0.txt or copy at
  * http://www.boost.org/LICENSE_1_0.txt)
  *
+ * 09 Oct 2011 - (ath) eliminated construction of objects on initialization of StaticVector
  * 23 Feb 2011 - (ath) converted to boost::StaticVector
  * 28 Dec 2010 - (mtc) Added cbegin and cend (and crbegin and crend) for C++Ox compatibility.
  * 10 Mar 2010 - (mtc) fill method added, matching resolution of the standard library working group.
