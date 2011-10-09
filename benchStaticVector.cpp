@@ -13,10 +13,10 @@ const unsigned N = 3001;
 extern bool some_test;
  
 template<typename T>
-T get_set(int)
+T get_set(std::size_t)
 {
     T s;
-    for (int i = 0; i < N; ++i)
+    for (std::size_t i = 0; i < N; ++i)
         while (!s.insert(std::rand()).second)
             ;
     if (some_test)
@@ -28,7 +28,7 @@ template<typename T>
 T generate()
 {
     T v;
-    for (int i = 0; i < N; ++i)
+    for (std::size_t i = 0; i < N; ++i)
         v.push_back(get_set<typename T::value_type>(i));
     if (some_test)
         return v;
@@ -60,12 +60,13 @@ float time_it()
 int main()
 {
     std::cout << "N = " << N << "\n\n";
+    
     std::cout << "StaticVector Benchmark:\n";
-    float t = time_it<boost::StaticVector<std::set<int>,N > >();
+    float t = time_it<boost::StaticVector<std::set<std::size_t>,N > >();
     std::cout << "Total time = " << t << "\n\n";
-    t=0.0;
+    
     std::cout << "Vector: Benchmark\n";
-    t = time_it<std::vector<std::set<int> > >();
+    t = time_it<std::vector<std::set<std::size_t> > >();
     std::cout << "Total time = " << t << '\n';
 }
  
