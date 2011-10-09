@@ -12,30 +12,30 @@ const unsigned N = 3001;
  
 extern bool some_test;
  
-std::set<int>
-get_set(int)
+template<typename T>
+T get_set(int)
 {
-    std::set<int> s;
+    T s;
     for (int i = 0; i < N; ++i)
         while (!s.insert(std::rand()).second)
             ;
     if (some_test)
         return s;
-    return std::set<int>();
+    return T();
 }
  
- template<typename T>
+template<typename T>
 T generate()
 {
     T v;
     for (int i = 0; i < N; ++i)
-        v.push_back(get_set(i));
+        v.push_back(get_set<typename T::value_type>(i));
     if (some_test)
         return v;
     return T();
 }
  
- template<typename T>
+template<typename T>
 float time_it()
 {
     clock_t t1, t2, t3, t4;
