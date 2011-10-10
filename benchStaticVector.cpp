@@ -7,6 +7,7 @@
 #include <time.h>
 #include <set>
 #include <algorithm>
+#include <exception>
  
 const unsigned N = 3001;
  
@@ -59,6 +60,7 @@ float time_it()
 
 int main()
 {
+  try {
     std::cout << "N = " << N << "\n\n";
     
     std::cout << "StaticVector Benchmark:\n";
@@ -68,6 +70,9 @@ int main()
     std::cout << "Vector: Benchmark\n";
     t = time_it<std::vector<std::set<std::size_t> > >();
     std::cout << "Total time = " << t << '\n';
+  }catch(std::exception e){
+    std::cout << e.what();
+  }
 }
  
 bool some_test = true;

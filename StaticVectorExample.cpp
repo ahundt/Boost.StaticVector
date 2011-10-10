@@ -16,13 +16,35 @@
  
 #include <iostream>
 #include <string>
+#include <set>
 #include "StaticVector.hpp"
 
 using namespace std;
 using namespace boost;
 
+typedef StaticVector<std::set<std::size_t>,3> ThreeSetType;
+  
 void print(std::size_t value){
   cout << " " << value;
+}
+
+
+void printSet(std::set<std::size_t> value){
+  cout << " (";
+  std::for_each(value.begin(),value.end(),print);
+  cout << ")";
+}
+
+ThreeSetType makeThreeSet(){
+  ThreeSetType t;
+  std::set<std::size_t> s;
+  s.insert(3);
+  t.push_back(s);
+  s.insert(2);
+  t.push_back(s);
+  s.insert(1);
+  t.push_back(s);
+  return t;
 }
 
 int main(char* argc, int argv){
@@ -53,6 +75,17 @@ int main(char* argc, int argv){
   cout << "size: " << three.size() << " capacity: "  << three.capacity() << std::endl; // size: 3 capacity: 3
   cout << "Values:" << std::endl;
   std::for_each(three.begin(),three.end(),print);
+  cout << std::endl;
+  cout << "Creating threeSet, a StaticVector of 3 std::set objects containing (3), (3 2), and (3 2 1), respectively" << std::endl;
+  ThreeSetType threeSet = makeThreeSet();
+  cout << "threeSet Values:" << std::endl;
+  std::for_each(threeSet.begin(),threeSet.end(),printSet);
+  
+  cout << std::endl;
+  cout << "Sorting threeSet:" << std::endl;
+  std::sort(threeSet.begin(), threeSet.end());
+  std::for_each(threeSet.begin(),threeSet.end(),printSet);
+  
   cout << std::endl << "Success!" << std::endl;
   
 }

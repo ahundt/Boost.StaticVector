@@ -65,6 +65,7 @@
 #include <boost/integer.hpp>
 #include <boost/type_traits/alignment_of.hpp>
 #include <boost/type_traits/aligned_storage.hpp>
+#include <boost/type_traits/has_trivial_destructor.hpp>
 
 
 namespace boost {
@@ -164,6 +165,11 @@ namespace boost {
           std::copy(rhs.begin(),rhs.end(),begin());
         }
 
+        ~StaticVector(){
+          destroy_array(::boost::has_trivial_destructor<T>());
+          m_size=0;
+        }
+
         void push_back (const_reference x){
           capacitycheck(size()+1);
           
@@ -176,7 +182,7 @@ namespace boost {
             to_object(size()-1)->~T();
             m_size--;
           } else {
-            throw std::out_of_range("StaticVector<> pop called on empty container.");
+            boost::throw_exception( std::out_of_range("StaticVector<> pop called on empty container."));
           }
         }
 
@@ -339,13 +345,22 @@ namespace boost {
        
 private:
     inline const_pointer to_object(size_type index) const {
-        return reinterpret_cast<const_pointer>(elems) + index;
+        return reinterpret_cast<const_pointer>(elems+index);
     }
     
     inline pointer to_object(size_type index) {
-        return reinterpret_cast<pointer>(elems) + index;
+        return reinterpret_cast<pointer>(elems+index);
     }
     
+    // T has a trivial destructor, do nothing
+    inline void destroy_array(const boost::true_type&) {}
+    
+    // T has a destructor, destroy each object 
+    inline void destroy_array(const boost::false_type&) {
+        for(iterator first = begin(); first != end(); ++first) {
+           first->~T();
+        }
+    }
 }; // class StaticVector
 
 #if !defined(BOOST_NO_TEMPLATE_PARTIAL_SPECIALIZATION)
