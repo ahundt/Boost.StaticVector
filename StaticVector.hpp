@@ -182,7 +182,7 @@ namespace boost {
             to_object(size()-1)->~T();
             m_size--;
           } else {
-            boost::throw_exception( std::out_of_range("StaticVector<> pop called on empty container."));
+            BOOST_THROW_EXCEPTION( std::out_of_range("StaticVector<> pop called on empty container."));
           }
         }
 
@@ -331,7 +331,7 @@ namespace boost {
        void rangecheck (max_size_type i) const {
             if (i >= size()) {
                 std::out_of_range e("StaticVector<>: index out of range");
-                boost::throw_exception(e);
+                BOOST_THROW_EXCEPTION(e);
             }
         }
 
@@ -339,7 +339,7 @@ namespace boost {
       void capacitycheck (max_size_type i) const {
            if (i > capacity()) {
                std::out_of_range e("StaticVector<>: index out of capacity");
-               boost::throw_exception(e);
+               BOOST_THROW_EXCEPTION(e);
            }
        }
        
@@ -533,7 +533,7 @@ private:
         // check range (may be private because it is static)
         static reference failed_rangecheck () {
                 std::out_of_range e("attempt to access element of an empty StaticVector");
-                boost::throw_exception(e);
+                BOOST_THROW_EXCEPTION(e);
 #if defined(BOOST_NO_EXCEPTIONS) || !defined(BOOST_MSVC)
                 //
                 // We need to return something here to keep
