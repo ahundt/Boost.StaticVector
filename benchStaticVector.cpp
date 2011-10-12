@@ -9,7 +9,7 @@
 #include <algorithm>
 #include <exception>
  
-const unsigned N = 3001;
+const unsigned N = 3;
  
 extern bool some_test;
  
@@ -42,13 +42,13 @@ float time_it()
     clock_t t1, t2, t3, t4;
     clock_t t0 = clock();
     {
-    T v = generate<T>();
+    T v(generate<T>());
     t1 = clock();
     std::cout << "construction took " << (float)((t1 - t0)/(double)CLOCKS_PER_SEC) << std::endl;
-    std::sort(v.begin(), v.end());
+    //std::sort(v.begin(), v.end());
     t2 = clock();
     std::cout << "sort took " << (float)((t2 - t1)/(double)CLOCKS_PER_SEC) << std::endl;
-    std::rotate(v.begin(), v.begin() + v.size()/2, v.end());
+    //std::rotate(v.begin(), v.begin() + v.size()/2, v.end());
     t3 = clock();
     std::cout << "rotate took " << (float)((t3 - t2)/(double)CLOCKS_PER_SEC) << std::endl;
     }

@@ -48,7 +48,7 @@ BOOST_AUTO_TEST_CASE(StaticVectorConstructor){
 }
 
 BOOST_AUTO_TEST_CASE(ConstructFromArray){
-  int array[VEC_SIZE] = {0,1,2,3,4};
+  std::size_t array[VEC_SIZE] = {0,1,2,3,4};
   StaticVector<std::size_t,VEC_SIZE> vec(array,&array[VEC_SIZE]);
   BOOST_CHECK_EQUAL(vec.size(),VEC_SIZE);
 }

@@ -7,12 +7,17 @@
  * an STL container (as wrapper) for a statically allocated vector with a constant size limit.
  *  StaticVector is not accepted as part of boost.
  *
+ * (C) Andrew Hundt 2011
  * (C) Carnegie Mellon University 2011
  * @author Andrew Hundt <ahundt@cmu.edu>
+ *
+ * some portions are based on AutoBuffer
+ * (C) Copyright Thorsten Ottosen, 2009.
  *
  * based on boost::array
  * The original author site of boost::array is at: http://www.josuttis.com/
  * (C) Copyright Nicolai M. Josuttis 2001.
+ *
  *
  * Distributed under the Boost Software License, Version 1.0. (See
  * accompanying file LICENSE_1_0.txt or copy at
@@ -53,6 +58,8 @@
 #if ((BOOST_VERSION / 100) % 1000) > 44
 #include <boost/swap.hpp>
 #endif
+#include <boost/iterator/reverse_iterator.hpp>
+#include <boost/iterator/iterator_traits.hpp>
 // Handles broken standard libraries better than <iterator>
 #include <boost/detail/iterator.hpp>
 #include <boost/throw_exception.hpp>
@@ -65,10 +72,30 @@
 #include <boost/integer.hpp>
 #include <boost/type_traits/alignment_of.hpp>
 #include <boost/type_traits/aligned_storage.hpp>
+#include <boost/type_traits/has_nothrow_copy.hpp>
+#include <boost/type_traits/has_nothrow_assign.hpp>
+#include <boost/type_traits/has_trivial_assign.hpp>
+#include <boost/type_traits/has_trivial_constructor.hpp>
 #include <boost/type_traits/has_trivial_destructor.hpp>
 
 
 namespace boost {
+ /* template<class T, std::size_t N>
+  class StaticVector;*/
+
+  namespace detail { // forward declarations
+        template< typename InputIterator, typename OutputIterator >
+        static void uninitialized_copy_backward(InputIterator begin, InputIterator end, OutputIterator result);
+
+        /*template< class InputIterator, typename T, std::size_t N>
+        static void copy( InputIterator begin, InputIterator end, typename StaticVector<T,N>::iterator result );
+    
+        template< class InputIterator, typename T, std::size_t N>
+        static void copy_backward( InputIterator begin, InputIterator end, typename StaticVector<T,N>::iterator result );
+        
+        template< class InputIterator, typename T, std::size_t N>
+        static void assign( InputIterator begin, InputIterator end, typename StaticVector<T,N>::iterator  result );*/
+  }
 
     template<class T, std::size_t N>
     class StaticVector {
@@ -88,6 +115,11 @@ namespace boost {
         typedef typename boost::uint_value_t<N>::least         size_type;
         typedef std::size_t                                    max_size_type;
         typedef std::ptrdiff_t                                 difference_type;
+        typedef typename boost::mpl::if_c< boost::has_trivial_assign<T>::value
+                                           && sizeof(T) <= sizeof(long double),
+                                          const value_type, 
+                                          const_reference >::type
+                                                      optimized_const_reference;
         
       private:
         size_type m_size; // fastest type that can accomodate N
@@ -154,7 +186,7 @@ namespace boost {
           m_size(last-first)
         {
           capacitycheck(size());
-          std::copy(first,last,begin());
+          copy_impl(first,last,begin());
         }
 
         template<std::size_t SizeRHS>
@@ -162,25 +194,26 @@ namespace boost {
           m_size(rhs.size())
         {
           capacitycheck(rhs.size());
-          std::copy(rhs.begin(),rhs.end(),begin());
+          copy_impl<StaticVector<T,SizeRHS>::iterator,T,N>(rhs.begin(),rhs.end(),begin());
         }
 
         ~StaticVector(){
           destroy_array(::boost::has_trivial_destructor<T>());
-          m_size=0;
         }
 
         void push_back (const_reference x){
           capacitycheck(size()+1);
-          
           new (to_object(size())) T(x);
           m_size++;
         }
 
+        void unchecked_push_back (const_reference x){
+        }
+
         void pop_back(){
           if(!empty()){
-            to_object(size()-1)->~T();
             m_size--;
+            to_object(size())->~T();
           } else {
             BOOST_THROW_EXCEPTION( std::out_of_range("StaticVector<> pop called on empty container."));
           }
@@ -188,7 +221,7 @@ namespace boost {
 
         iterator insert(iterator pos, const_reference x){
           capacitycheck(size()+1);
-          std::copy_backward(pos,end(),end()+1);
+          copy_backward_impl(pos,end(),end()+1);
           *pos = x;
           m_size++;
           return pos;
@@ -196,7 +229,7 @@ namespace boost {
 
         void insert(iterator pos, max_size_type n, const_reference x){
           capacitycheck(size()+n);
-          std::copy_backward(pos,end(),end()+n);
+          copy_backward_impl(pos,end(),end()+n);
           std::fill(pos,pos+n,x);
           m_size+=n;
         }
@@ -205,14 +238,14 @@ namespace boost {
         void insert(iterator pos, InputIterator first, InputIterator last){
           max_size_type n = last - first;
           capacitycheck(size()+n);
-          std::copy_backward(pos,end(),end()+n);
-          std::copy(first,last,pos);
+          copy_backward_impl(pos,end(),end()+n);
+          copy_impl(first,last,pos);
         }
 
         iterator erase(iterator pos){
           rangecheck(pos-begin());
           pos->~T();
-          std::copy(pos+1,end(),pos);
+          copy_impl(pos+1,end(),pos);
           m_size--;
           return pos;
         }
@@ -224,7 +257,7 @@ namespace boost {
       	    for(iterator it = first; it!=last; it++){
       	      it->~T();
       	    }
-      	    std::copy(last,end(),first);
+      	    copy_impl(last,end(),first);
       	    m_size -= n;
       	  }
           return first;
@@ -241,8 +274,8 @@ namespace boost {
           } else {
             erase(begin()+n,end());
           }
-	  m_size = n;
-	}
+	        m_size = n;
+	      }
 
         void reserve(max_size_type n){
           capacitycheck(n);
@@ -287,9 +320,10 @@ namespace boost {
         }
 
         // capacity is constant, size varies
-        max_size_type size() const { return m_size; }
-        static max_size_type capacity() { return N; }
-        bool empty() { return m_size == 0; }
+        inline max_size_type size() const { return m_size; }
+        inline static max_size_type capacity() { return N; }
+        bool empty() { return size() == 0; }
+        bool full() { return size() >= capacity(); }
         static max_size_type max_size() { return N; }
         enum { static_size = N };
 
@@ -315,7 +349,7 @@ namespace boost {
         // assignment with type conversion
         template <typename T2>
         StaticVector<T,N>& operator= (const StaticVector<T2,N>& rhs) {
-            std::copy(rhs.begin(),rhs.end(), begin());
+            copy_impl(rhs.begin(),rhs.end(), begin());
             m_size = rhs.size();
             return *this;
         }
@@ -324,11 +358,11 @@ namespace boost {
         void assign (const T& value) { fill ( value ); }    // A synonym for fill
         void fill   (const T& value)
         {
-            std::fill_n(begin(),size(),value);
+            assign_impl(begin(),end(),value);
         }
 
         // check range (may be private because it is static)
-       void rangecheck (max_size_type i) const {
+        void rangecheck (max_size_type i) {
             if (i >= size()) {
                 std::out_of_range e("StaticVector<>: index out of range");
                 BOOST_THROW_EXCEPTION(e);
@@ -336,8 +370,8 @@ namespace boost {
         }
 
        // check range (may be private because it is static)
-      void capacitycheck (max_size_type i) const {
-           if (i > capacity()) {
+      static void capacitycheck (max_size_type i) {
+           if (i > N) {
                std::out_of_range e("StaticVector<>: index out of capacity");
                BOOST_THROW_EXCEPTION(e);
            }
@@ -357,10 +391,103 @@ private:
     
     // T has a destructor, destroy each object 
     inline void destroy_array(const boost::false_type&) {
+      //int i = 0;
+      //iterator theend = this->end();
+      //  for(iterator first = begin(); first != theend; ++first) {
+      //     first->~T();
+      //     i++;
+      //    std::cout << "i " << i << " *first " << sizeof(*first) << " elems " << sizeof(elems[0]) << " " << first-theend << std::endl;
+      //  }
         for(iterator first = begin(); first != end(); ++first) {
            first->~T();
         }
     }
+    
+    
+    
+        // TODO: Should parameter 3 be boost::random_access_traversal_tag?
+        template< class InputIterator>
+        static void copy_impl( InputIterator begin, InputIterator end, iterator result, std::random_access_iterator_tag )
+        {
+            copy_rai( begin, end, result, boost::has_trivial_assign<T>() );
+        }
+
+        static void copy_rai( const_iterator  begin, const_iterator end, 
+                              iterator result, const boost::true_type& )
+        {
+            std::memcpy( result, begin, sizeof(T) * std::distance(begin,end) );
+        }
+
+        template< class InputIterator, bool b >
+        static void copy_rai( InputIterator begin, InputIterator end, 
+                              iterator result, const boost::integral_constant<bool, b>& )
+        {
+            std::uninitialized_copy( begin, end, result );
+        }        
+        
+        template< class InputIterator>
+        static void copy_impl( InputIterator begin, InputIterator end, iterator result, boost::single_pass_traversal_tag )
+        {
+            std::uninitialized_copy( begin, end, result );
+        }
+        
+        template< class InputIterator>
+        static void copy_impl( InputIterator begin, InputIterator end, iterator result )
+        {
+            copy_impl( begin, end, result, typename boost::iterator_category<InputIterator>::type() );
+        }
+        
+        // TODO: Should parameter 3 be boost::random_access_traversal_tag?
+        template< class InputIterator>
+        static void copy_backward_impl( InputIterator begin, InputIterator end, iterator result, std::random_access_iterator_tag )
+        {
+            copy_backward_rai( begin, end, result, boost::has_trivial_assign<T>() );
+        }
+
+        template< class InputIterator>
+        static void copy_backward_rai( iterator begin, iterator end, 
+                              iterator result, const boost::true_type& )
+        {
+            std::memmove( result, begin, sizeof(T) * std::distance(begin,end) );
+        }
+
+        template< class InputIterator, bool b >
+        static void copy_backward_rai( InputIterator begin, InputIterator end, 
+                              iterator result, const boost::integral_constant<bool, b>& )
+        {
+            detail::uninitialized_copy_backward( begin, end, result );
+        }        
+        
+        template< class InputIterator>
+        static void copy_backward_impl( InputIterator begin, InputIterator end, iterator result, boost::single_pass_traversal_tag )
+        {
+            detail::uninitialized_copy_backward( begin, end, result );
+        }
+        
+        template< class InputIterator>
+        static void copy_backward_impl( InputIterator begin, InputIterator end, iterator result )
+        {
+            copy_backward_impl( begin, end, result, typename boost::iterator_category<InputIterator>::type() );
+        }
+
+        template< class InputIterator>
+        static void assign_impl( InputIterator begin, InputIterator end, iterator  result )
+        {
+            assign_impl( begin, end, result, boost::has_trivial_assign<T>() );
+        }
+
+        template< class InputIterator>
+        static void assign_impl( InputIterator begin, InputIterator end, iterator  result, const boost::true_type& )
+        {
+            std::memcpy( result, begin, sizeof(T) * std::distance(begin,end) ); 
+        }
+
+        template< class InputIterator>
+        static void assign_impl( InputIterator begin, InputIterator end, iterator  result, const boost::false_type& )
+        {
+            for( ; begin != end; ++begin, ++result )
+                *result = *begin;
+        }
 }; // class StaticVector
 
 #if !defined(BOOST_NO_TEMPLATE_PARTIAL_SPECIALIZATION)
@@ -505,9 +632,10 @@ private:
         }
 
         // size is constant
-        static max_size_type size() { return 0; }
-        static bool empty() { return true; }
-        static max_size_type max_size() { return 0; }
+        inline static max_size_type size() { return 0; }
+        inline static bool empty() { return true; }
+        inline static bool full() { return true; }
+        inline static max_size_type max_size() { return 0; }
         enum { static_size = 0 };
 
         void swap (StaticVector<T,0>& /*y*/) {
@@ -640,7 +768,100 @@ private:
 #endif
 
 
-} /* namespace boost */
+
+namespace detail{
+/*
+        template< class InputIterator, typename T, std::size_t N>
+        static void copy( InputIterator begin, InputIterator end, typename StaticVector<T,N>::iterator result, boost::random_access_traversal_tag )
+        {
+            copy_rai( begin, end, result, boost::has_trivial_assign<T>() );
+        }
+
+        template<typename T, std::size_t N>
+        static void copy_rai( typename StaticVector<T,N>::const_iterator  begin, typename StaticVector<T,N>::const_iterator end, 
+                              typename StaticVector<T,N>::iterator result, const boost::true_type& )
+        {
+            std::memcpy( result, begin, sizeof(T) * std::distance(begin,end) );
+        }
+
+        template< class InputIterator, typename T, std::size_t N, bool b >
+        static void copy_rai( InputIterator begin, InputIterator end, 
+                              typename StaticVector<T,N>::iterator result, const boost::integral_constant<bool, b>& )
+        {
+            std::uninitialized_copy( begin, end, result );
+        }        
+        
+        template< class InputIterator, typename T, std::size_t N>
+        static void copy( InputIterator begin, InputIterator end, typename StaticVector<T,N>::iterator result, boost::single_pass_traversal_tag )
+        {
+            std::uninitialized_copy( begin, end, result );
+        }
+        
+        template< class InputIterator, typename T, std::size_t N>
+        static void copy( InputIterator begin, InputIterator end, typename StaticVector<T,N>::iterator result )
+        {
+            copy( begin, end, result, typename boost::iterator_category<InputIterator>::type() );
+        }
+        
+        template< class InputIterator, typename T, std::size_t N>
+        static void copy_backward( InputIterator begin, InputIterator end, typename StaticVector<T,N>::iterator result, boost::random_access_traversal_tag )
+        {
+            copy_backward_rai( begin, end, result, boost::has_trivial_assign<T>() );
+        }
+
+        template< class InputIterator, typename T, std::size_t N>
+        static void copy_backward_rai( typename StaticVector<T,N>::iterator begin, typename StaticVector<T,N>::iterator end, 
+                              typename StaticVector<T,N>::iterator result, const boost::true_type& )
+        {
+            std::memmove( result, begin, sizeof(T) * std::distance(begin,end) );
+        }
+
+        template< class InputIterator, typename T, std::size_t N, bool b >
+        static void copy_backward_rai( InputIterator begin, InputIterator end, 
+                              typename StaticVector<T,N>::iterator result, const boost::integral_constant<bool, b>& )
+        {
+            uninitialized_copy_backward( begin, end, result );
+        }        
+        
+        template< class InputIterator, typename T, std::size_t N>
+        static void copy_backward( InputIterator begin, InputIterator end, typename StaticVector<T,N>::iterator result, boost::single_pass_traversal_tag )
+        {
+            uninitialized_copy_backward( begin, end, result );
+        }*/
+        
+        template< typename InputIterator, typename OutputIterator >
+        static void uninitialized_copy_backward(InputIterator begin, InputIterator end, OutputIterator result){
+            while (end!=begin) new (static_cast<void*>(&*(--result))) typename iterator_traits<InputIterator>::value_type(typename iterator_traits<InputIterator>::value_type(*(--end)));
+            return result;
+        }
+        /*
+        template< class InputIterator, typename T, std::size_t N>
+        static void copy_backward( InputIterator begin, InputIterator end, typename StaticVector<T,N>::iterator result )
+        {
+            copy_backward( begin, end, result, typename boost::iterator_category<InputIterator>::type() );
+        }
+
+        template< class InputIterator, typename T, std::size_t N>
+        static void assign( InputIterator begin, InputIterator end, typename StaticVector<T,N>::iterator  result )
+        {
+            assign( begin, end, result, boost::has_trivial_assign<T>() );
+        }
+
+        template< class InputIterator, typename T, std::size_t N>
+        static void assign( InputIterator begin, InputIterator end, typename StaticVector<T,N>::iterator  result, const boost::true_type& )
+        {
+            std::memcpy( result, begin, sizeof(T) * std::distance(begin,end) ); 
+        }
+
+        template< class InputIterator, typename T, std::size_t N>
+        static void assign( InputIterator begin, InputIterator end, typename StaticVector<T,N>::iterator  result, const boost::false_type& )
+        {
+            for( ; begin != end; ++begin, ++result )
+                *result = *begin;
+        }*/
+} // namespace detail 
+
+} // namespace boost
 
 
 #if BOOST_WORKAROUND(BOOST_MSVC, >= 1400)  
