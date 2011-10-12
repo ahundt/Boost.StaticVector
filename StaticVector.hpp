@@ -361,7 +361,7 @@ namespace boost {
             assign_impl(begin(),end(),value);
         }
 
-        // check range (may be private because it is static)
+        // check range (may not be private because it is not static)
         void rangecheck (max_size_type i) {
             if (i >= size()) {
                 std::out_of_range e("StaticVector<>: index out of range");
@@ -369,7 +369,8 @@ namespace boost {
             }
         }
 
-       // check range (may be private because it is static)
+private:
+       // check capacity (may be private because it is static)
       static void capacitycheck (max_size_type i) {
            if (i > N) {
                std::out_of_range e("StaticVector<>: index out of capacity");
@@ -377,7 +378,6 @@ namespace boost {
            }
        }
        
-private:
     inline const_pointer to_object(size_type index) const {
         return reinterpret_cast<const_pointer>(elems+index);
     }
