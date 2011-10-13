@@ -64,12 +64,14 @@ int main()
     std::cout << "N = " << N << "\n\n";
     
     std::cout << "StaticVector Benchmark:\n";
-    float t = time_it<boost::StaticVector<std::set<std::size_t>,N > >();
-    std::cout << "Total time = " << t << "\n\n";
+    float tsv = time_it<boost::StaticVector<std::set<std::size_t>,N > >();
+    std::cout << "Total time = " << tsv << "\n\n";
     
     std::cout << "Vector: Benchmark\n";
-    t = time_it<std::vector<std::set<std::size_t> > >();
-    std::cout << "Total time = " << t << '\n';
+    float tv = time_it<std::vector<std::set<std::size_t> > >();
+    std::cout << "Total time = " << tv << "\n\n";
+    
+    std::cout << "StaticVector time / Vector time = " << tsv/tv << '\n';
   }catch(std::exception e){
     std::cout << e.what();
   }
