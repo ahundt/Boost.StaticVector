@@ -200,11 +200,12 @@ namespace boost {
 
         void push_back (const_reference x){
           capacitycheck(size()+1);
-          new (to_object(size())) T(x);
-          m_size++;
+          unchecked_push_back(x);
         }
 
         void unchecked_push_back (const_reference x){
+          new (to_object(size())) T(x);
+          m_size++;
         }
 
         void pop_back(){
@@ -248,15 +249,14 @@ namespace boost {
         }
 
         iterator erase(iterator first, iterator last){
-          std::ptrdiff_t n = last-first;
-	        if (n>0) {
-      	    rangecheck(size()-n);
-      	    for(iterator it = first; it!=last; it++){
-      	      it->~T();
-      	    }
-      	    copy_impl(last,end(),first);
-      	    m_size -= n;
+          difference_type n = last-first;
+      	  rangecheck(size()-n);
+      	  for(iterator it = first; first!=last; ++first){
+      	    it->~T();
       	  }
+      	  copy_impl(last,end(),first);
+      	  m_size -= n;
+      	  
           return first;
         }
 
@@ -368,7 +368,7 @@ namespace boost {
 
 private:
        // check capacity (may be private because it is static)
-      static void capacitycheck (max_size_type i) {
+      inline static void capacitycheck (max_size_type i) {
            if (i > N) {
                std::out_of_range e("StaticVector<>: index out of capacity");
                BOOST_THROW_EXCEPTION(e);
@@ -394,93 +394,93 @@ private:
        }
        
        template< class InputIterator>
-       static void copy_impl( InputIterator begin, InputIterator end, iterator result, std::random_access_iterator_tag )
+       inline static void copy_impl( InputIterator begin, InputIterator end, iterator result, std::random_access_iterator_tag )
        {
            copy_rai( begin, end, result, boost::has_trivial_assign<T>() );
        }
        template< class InputIterator>
-       static void copy_impl( InputIterator begin, InputIterator end, iterator result, boost::random_access_traversal_tag )
+       inline static void copy_impl( InputIterator begin, InputIterator end, iterator result, boost::random_access_traversal_tag )
        {
            copy_rai( begin, end, result, boost::has_trivial_assign<T>() );
        }
        
-       static void copy_rai( const_iterator  begin, const_iterator end, 
+       inline static void copy_rai( const_iterator  begin, const_iterator end, 
                              iterator result, const boost::true_type& )
        {
            std::memcpy( result, begin, sizeof(T) * std::distance(begin,end) );
        }
        
        template< class InputIterator, bool b >
-       static void copy_rai( InputIterator begin, InputIterator end, 
+       inline static void copy_rai( InputIterator begin, InputIterator end, 
                              iterator result, const boost::integral_constant<bool, b>& )
        {
            std::uninitialized_copy( begin, end, result );
        }        
        
        template< class InputIterator>
-       static void copy_impl( InputIterator begin, InputIterator end, iterator result, boost::single_pass_traversal_tag )
+       inline static void copy_impl( InputIterator begin, InputIterator end, iterator result, boost::single_pass_traversal_tag )
        {
            std::uninitialized_copy( begin, end, result );
        }
        
        template< class InputIterator>
-       static void copy_impl( InputIterator begin, InputIterator end, iterator result )
+       inline static void copy_impl( InputIterator begin, InputIterator end, iterator result )
        {
            copy_impl( begin, end, result, typename boost::iterator_category<InputIterator>::type() );
        }
        
        template< class InputIterator>
-       static void copy_backward_impl( InputIterator begin, InputIterator end, iterator result, std::random_access_iterator_tag )
+       inline static void copy_backward_impl( InputIterator begin, InputIterator end, iterator result, std::random_access_iterator_tag )
        {
            copy_backward_rai( begin, end, result, boost::has_trivial_assign<T>() );
        }
        
        template< class InputIterator>
-       static void copy_backward_impl( InputIterator begin, InputIterator end, iterator result, boost::random_access_traversal_tag )
+       inline static void copy_backward_impl( InputIterator begin, InputIterator end, iterator result, boost::random_access_traversal_tag )
        {
            copy_backward_rai( begin, end, result, boost::has_trivial_assign<T>() );
        }
        
        template< class InputIterator>
-       static void copy_backward_rai( iterator begin, iterator end, 
+       inline static void copy_backward_rai( iterator begin, iterator end, 
                              iterator result, const boost::true_type& )
        {
            std::memmove( result, begin, sizeof(T) * std::distance(begin,end) );
        }
        
        template< class InputIterator, bool b >
-       static void copy_backward_rai( InputIterator begin, InputIterator end, 
+       inline static void copy_backward_rai( InputIterator begin, InputIterator end, 
                              iterator result, const boost::integral_constant<bool, b>& )
        {
            detail::uninitialized_copy_backward( begin, end, result );
        }
        
        template< class InputIterator>
-       static void copy_backward_impl( InputIterator begin, InputIterator end, iterator result, boost::single_pass_traversal_tag )
+       inline static void copy_backward_impl( InputIterator begin, InputIterator end, iterator result, boost::single_pass_traversal_tag )
        {
            detail::uninitialized_copy_backward( begin, end, result );
        }
        
        template< class InputIterator>
-       static void copy_backward_impl( InputIterator begin, InputIterator end, iterator result )
+       inline static void copy_backward_impl( InputIterator begin, InputIterator end, iterator result )
        {
            copy_backward_impl( begin, end, result, typename boost::iterator_category<InputIterator>::type() );
        }
        
        template< class InputIterator>
-       static void assign_impl( InputIterator begin, InputIterator end, iterator  result )
+       inline static void assign_impl( InputIterator begin, InputIterator end, iterator  result )
        {
            assign_impl( begin, end, result, boost::has_trivial_assign<T>() );
        }
        
        template< class InputIterator>
-       static void assign_impl( InputIterator begin, InputIterator end, iterator  result, const boost::true_type& )
+       inline static void assign_impl( InputIterator begin, InputIterator end, iterator  result, const boost::true_type& )
        {
            std::memcpy( result, begin, sizeof(T) * std::distance(begin,end) ); 
        }
        
        template< class InputIterator>
-       static void assign_impl( InputIterator begin, InputIterator end, iterator  result, const boost::false_type& )
+       inline static void assign_impl( InputIterator begin, InputIterator end, iterator  result, const boost::false_type& )
        {
            for( ; begin != end; ++begin, ++result )
                *result = *begin;
