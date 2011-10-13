@@ -456,12 +456,6 @@ private:
        }
        
        template< class InputIterator>
-       static void copy_backward_impl( InputIterator begin, InputIterator end, iterator result, std::random_access_iterator_tag )
-       {
-           detail::uninitialized_copy_backward( begin, end, result );
-       }        
-       
-       template< class InputIterator>
        static void copy_backward_impl( InputIterator begin, InputIterator end, iterator result, boost::single_pass_traversal_tag )
        {
            detail::uninitialized_copy_backward( begin, end, result );
