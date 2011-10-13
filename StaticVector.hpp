@@ -197,6 +197,12 @@ namespace boost {
           copy_impl<StaticVector<T,SizeRHS>::iterator,T,N>(rhs.begin(),rhs.end(),begin());
         }
 
+        StaticVector(const StaticVector<T,N>& rhs):
+          m_size(rhs.size())
+        {
+          copy_impl<StaticVector<T,SizeRHS>::iterator,T,N>(rhs.begin(),rhs.end(),begin());
+        }
+
         ~StaticVector(){
           destroy_array(::boost::has_trivial_destructor<T>());
         }
