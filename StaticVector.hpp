@@ -493,13 +493,13 @@ private:
        inline static void copy_rai( InputIterator begin, InputIterator end, 
                              iterator result, const boost::integral_constant<bool, b>& )
        {
-           std::uninitialized_copy( begin, end, result );
+           std::copy( begin, end, result );
        }        
        
        template< class InputIterator>
        inline static void copy_impl( InputIterator begin, InputIterator end, iterator result, boost::single_pass_traversal_tag )
        {
-           std::uninitialized_copy( begin, end, result );
+           std::copy( begin, end, result );
        }
        
        template< class InputIterator>
@@ -531,13 +531,13 @@ private:
        inline static void copy_backward_rai( InputIterator begin, InputIterator end, 
                              iterator result, const boost::integral_constant<bool, b>& )
        {
-           detail::uninitialized_copy_backward( begin, end, result );
+           detail::copy_backward( begin, end, result );
        }
        
        template< class InputIterator>
        inline static void copy_backward_impl( InputIterator begin, InputIterator end, iterator result, boost::single_pass_traversal_tag )
        {
-           detail::uninitialized_copy_backward( begin, end, result );
+           detail::copy_backward( begin, end, result );
        }
        
        template< class InputIterator>
