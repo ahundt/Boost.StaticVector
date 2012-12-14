@@ -80,15 +80,13 @@
 
 
 namespace boost {
- /* template<class T, std::size_t N>
-  class StaticVector;*/
 
   namespace detail { // forward declarations
         template< typename InputIterator, typename OutputIterator >
         static void uninitialized_copy_backward(InputIterator begin, InputIterator end, OutputIterator result);
   }
 
-    template<class T, std::size_t N>
+    template<class T, std::size_t N, typename size_type_t = typename boost::uint_value_t<N>::least>
     class StaticVector {
       public:
         // type definitions
@@ -103,8 +101,8 @@ namespace boost {
                            sizeof(T),                          
                            boost::alignment_of<T>::value       
                          >::type                               aligned_storage;
-        typedef typename boost::uint_value_t<N>::least         size_type;
-        typedef std::size_t                                    max_size_type;
+        typedef size_type_t                                    size_type;
+        typedef size_type                                      max_size_type;
         typedef std::ptrdiff_t                                 difference_type;
         typedef typename boost::mpl::if_c< boost::has_trivial_assign<T>::value
                                            && sizeof(T) <= sizeof(long double),
@@ -176,6 +174,7 @@ namespace boost {
         StaticVector(InputIterator first, InputIterator last):
           m_size(last-first)
         {
+          // TODO: have this function call two versions of this function, one for foward iteration only and the other for random access
           capacitycheck(size());
           copy_impl(first,last,begin());
         }
@@ -187,7 +186,7 @@ namespace boost {
           capacitycheck(rhs.size());
           copy_impl<StaticVector<T,SizeRHS>::iterator,T,N>(rhs.begin(),rhs.end(),begin());
         }
-
+//*
         StaticVector(const StaticVector<T,N>& rhs):
           m_size(rhs.size())
         {
@@ -209,16 +208,13 @@ namespace boost {
         }
 
         void pop_back(){
-          if(!empty()){
-            m_size--;
-            to_object(size())->~T();
-          } else {
-            BOOST_THROW_EXCEPTION( std::out_of_range("StaticVector<> pop called on empty container."));
-          }
+          BOOST_ASSERT(!empty());
+          m_size--;
+          to_object(size())->~T();
         }
 
         iterator insert(iterator pos, const_reference x){
-          capacitycheck(size()+1);
+          BOOST_ASSERT(!capacitycheck(size()+1));
           copy_backward_impl(pos,end(),end()+1);
           *pos = x;
           m_size++;
@@ -234,14 +230,15 @@ namespace boost {
 
         template <typename InputIterator>
         void insert(iterator pos, InputIterator first, InputIterator last){
-          max_size_type n = last - first;
-          capacitycheck(size()+n);
+          // TODO: have this function call two versions of this function, one for foward iteration only and the other for random access
+          difference_type n = last-first;
+          BOOST_ASSERT(!capacitycheck(size()+n));
           copy_backward_impl(pos,end(),end()+n);
           copy_impl(first,last,pos);
         }
 
         iterator erase(iterator pos){
-          rangecheck(pos-begin());
+          BOOST_ASSERT(!rangecheck(pos-begin()));
           pos->~T();
           copy_impl(pos+1,end(),pos);
           m_size--;
@@ -250,7 +247,7 @@ namespace boost {
 
         iterator erase(iterator first, iterator last){
           difference_type n = last-first;
-      	  rangecheck(size()-n);
+      	  BOOST_ASSERT(!rangecheck(size()-n));
       	  for(iterator it = first; first!=last; ++first){
       	    it->~T();
       	  }
@@ -355,24 +352,32 @@ namespace boost {
         void assign (const T& value) { fill ( value ); }    // A synonym for fill
         void fill   (const T& value)
         {
-            assign_impl(begin(),end(),value);
+            // TODO: figure out where this came from and why this was here initially
+            //assign_impl(begin(),end(),value);
+          std::fill(begin(),end(),value);
         }
 
         // check range (may not be private because it is not static)
-        void rangecheck (max_size_type i) {
-            if (i >= size()) {
-                std::out_of_range e("StaticVector<>: index out of range");
-                BOOST_THROW_EXCEPTION(e);
-            }
+        // throws on failure
+        // returns: 0 on success, 1 otherwise when exceptions are disabled
+        bool rangecheck (max_size_type i) {
+          bool failure(i >= size());
+          if (failure) {
+              std::out_of_range e("StaticVector<>: index out of range");
+              BOOST_THROW_EXCEPTION(e);
+          }
+          return failure;
         }
 
 private:
        // check capacity (may be private because it is static)
-      inline static void capacitycheck (max_size_type i) {
-           if (i > N) {
-               std::out_of_range e("StaticVector<>: index out of capacity");
-               BOOST_THROW_EXCEPTION(e);
-           }
+      inline static bool capacitycheck (max_size_type i) {
+         bool failure(i > N);
+         if (failure) {
+            std::out_of_range e("StaticVector<>: index out of capacity");
+            BOOST_THROW_EXCEPTION(e);
+         }
+         return failure;
        }
        
        inline const_pointer to_object(size_type index) const {
@@ -387,10 +392,84 @@ private:
        inline void destroy_array(const boost::true_type&) {}
        
        // T has a destructor, destroy each object 
-       inline void destroy_array(const boost::false_type&) {
+       inline void destroy_array(const boost::false_type& ) {
            for(iterator first = begin(); first != end(); ++first) {
               first->~T();
            }
+       }
+       
+       template< class InputIterator>
+       inline iterator erase_impl( InputIterator begin, InputIterator end, std::random_access_iterator_tag )
+       {
+         return erase_rai(begin,end, boost::has_trivial_assign<T>());
+       }
+       template< class InputIterator>
+       inline iterator erase_impl( InputIterator begin, InputIterator end, boost::random_access_traversal_tag )
+       {
+         return erase_rai(begin,end, boost::has_trivial_assign<T>());
+       }
+       
+       template< class InputIterator>
+       inline iterator erase_impl( InputIterator begin, InputIterator end, boost::single_pass_traversal_tag )
+       {
+         return erase_spt(begin,end, boost::has_trivial_assign<T>());
+       } 
+       
+       // erase_rai = erase_random_access_iterator
+       template< class InputIterator>
+       inline iterator erase_rai( const_iterator  first, const_iterator last, const boost::true_type& )
+       {
+         // TODO: have this function work for random access with trivial destructor
+          difference_type n = last-first;
+      	  BOOST_ASSERT(!rangecheck(size()-n));
+      	  copy_impl(last,end(),first);
+      	  m_size -= n;
+      	  return first;
+       } // T has a trivial destructor, do nothing to objects
+       
+        // erase_rai = erase_random_access_iterator
+       template< class InputIterator, bool b >
+       inline iterator erase_rai( InputIterator first, InputIterator last, 
+                             iterator result, const boost::integral_constant<bool, b>& )
+       {
+          // TODO: have this function work for random access with real destructor
+      	  BOOST_ASSERT(!rangecheck(size()-(last-first)));
+      	  for(iterator it = first; first!=last; ++first){
+      	    it->~T();
+      	  }
+      	  copy_impl(last,end(),first);
+      	  m_size -= (last-first);
+       }
+       
+       template< class InputIterator, bool b>
+       inline iterator erase_spt( InputIterator first, InputIterator last, boost::true_type&){
+         // TODO: have this function work for single pass traversal with trivial destructor
+          difference_type n = last-first;
+       	  BOOST_ASSERT(!rangecheck(size()-n));
+      	  copy_impl(last,end(),first);
+      	  m_size -= n;
+      	  return first;
+       } // T has a trivial destructor, do nothing to objects
+       
+       template< class InputIterator, bool b>
+       inline iterator erase_spt( InputIterator first, InputIterator last, boost::false_type&){
+          iterator front = first;
+          iterator back = last;
+          // TODO: have this function work for single pass traversal with real destructor
+          difference_type n = last-first;
+          BOOST_ASSERT(!rangecheck(size()-n));
+      	  // move the back of the list up front
+      	  for(; first!=last && back!=end(); ++first, ++back){
+      	    front = back;
+      	    back->~T();
+      	    m_size--;
+      	  }
+      	  // erase remaining elements
+      	  for(; front!=last; ++front){
+      	    front->~T();
+      	    m_size--;
+      	  }
+      	  return first;
        }
        
        template< class InputIterator>
@@ -489,7 +568,7 @@ private:
 
 #if !defined(BOOST_NO_TEMPLATE_PARTIAL_SPECIALIZATION)
     template< class T >
-    class StaticVector< T, 0 > {
+    class StaticVector< T, 0 , typename boost::uint_value_t<0>::least> {
 
       public:
         // type definitions
@@ -503,7 +582,7 @@ private:
                            boost::alignment_of<T>::value       
                          >::type                               aligned_storage;
         typedef typename boost::uint_value_t<0>::least         size_type;
-        typedef std::size_t                                    max_size_type;
+        typedef size_type                                      max_size_type;
         typedef std::ptrdiff_t                                 difference_type;
 
         // iterator support
@@ -768,7 +847,7 @@ private:
 
 namespace detail{
         template< typename InputIterator, typename OutputIterator >
-        static void uninitialized_copy_backward(InputIterator begin, InputIterator end, OutputIterator result){
+        static OutputIterator uninitialized_copy_backward(InputIterator begin, InputIterator end, OutputIterator result){
             while (end!=begin) new (static_cast<void*>(&*(--result))) typename iterator_traits<InputIterator>::value_type(typename iterator_traits<InputIterator>::value_type(*(--end)));
             return result;
         }

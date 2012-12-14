@@ -47,7 +47,7 @@ ThreeSetType makeThreeSet(){
   return t;
 }
 
-int main(char* argc, int argv){
+int main(int argc, char** argv){
   
   cout << "Creating StaticVector of capacity 3" << std::endl;
   StaticVector<std::size_t,3> three;
